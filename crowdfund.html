@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>众筹 DApp</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{  
+  --bg:#f5f2eb;
+  --ink:#1a1814;
+  --paper:#fffdf7;
+  --line:#d4cfc4;
+  --gold:#c8961e;
+  --gold-lt:#f5e8c4;
+  --green:#2a7a4b;
+  --green-lt:#d4eedf;
+  --red:#b83232;
+  --red-lt:#f5dada;
+  --muted:#7a7568;
+  --r:6px;
+}
+
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Noto Sans SC',sans-serif;
+  min-height:100vh;
+  padding:0;
+}
+
+/* ── texture overlay ── */
+body::after{
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='%23b0a898' opacity='0.18'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;
+}
+
+.wrap{position:relative;z-index:1;max-width:680px;margin:0 auto;padding:2.5rem 1.25rem 4rem}
+
+/* ── Header ── */
+header{border-bottom:2px solid var(--ink);padding-bottom:1rem;margin-bottom:2rem;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:.75rem}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-1px;line-height:1}
+.logo span{color:var(--gold)}
+#wallet-info{font-size:.78rem;color:var(--muted);font-family:'Syne',sans-serif}
+.badge{background:var(--ink);color:var(--bg);font-size:.72rem;padding:.2rem .6rem;border-radius:3px;font-family:'Syne',sans-serif}
+
+/* ── Buttons ── */
+button{cursor:pointer;border:none;font-family:'Noto Sans SC',sans-serif;font-size:.875rem;transition:all .15s;border-radius:var(--r)}
+button:disabled{opacity:.4;cursor:not-allowed}
+
+.btn{background:var(--ink);color:var(--bg);padding:.6rem 1.4rem;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:.3px}
+.btn:hover:not(:disabled){background:#3a3630}
+.btn-outline{background:transparent;border:1.5px solid var(--ink);color:var(--ink);padding:.55rem 1.2rem}
+.btn-outline:hover:not(:disabled){background:var(--ink);color:var(--bg)}
+.btn-gold{background:var(--gold);color:#fff;padding:.6rem 1.4rem;font-family:'Syne',sans-serif;font-weight:700}
+.btn-gold:hover:not(:disabled){background:#a87a18}
+.btn-green{background:var(--green);color:#fff;padding:.6rem 1.4rem;font-family:'Syne',sans-serif;font-weight:700}
+.btn-green:hover:not(:disabled){background:#1f5e38}
+.btn-red{background:var(--red);color:#fff;padding:.6rem 1.2rem;font-family:'Syne',sans-serif;font-weight:700}
+.btn-red:hover:not(:disabled){background:#8f2424}
+
+/* ── Cards ── */
+.card{background:var(--paper);border:1.5px solid var(--line);border-radius:var(--r);padding:1.5rem;margin-bottom:1.25rem}
+.card-label{font-size:.68rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);font-family:'Syne',sans-serif;margin-bottom:1rem}
+
+/* ── Section visibility ── */
+.section{display:none}
+.section.on{display:block;animation:up .3s ease}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Inputs ── */
+.field{margin-bottom:.9rem}
+label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:.3rem}
+input,textarea{width:100%;background:#fff;border:1.5px solid var(--line);border-radius:var(--r);padding:.6rem .85rem;color:var(--ink);font-family:'Noto Sans SC',sans-serif;font-size:.875rem;outline:none;transition:border-color .15s}
+input:focus,textarea:focus{border-color:var(--ink)}
+textarea{resize:vertical;min-height:72px}
+
+.row{display:flex;gap:.75rem}
+.row .field{flex:1;margin-bottom:0}
+
+/* ── Progress ── */
+.progress-wrap{margin:1.2rem 0}
+.progress-track{height:10px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:.5rem}
+.progress-bar{height:100%;background:var(--gold);border-radius:99px;transition:width .6s ease;min-width:2px}
+.progress-bar.done{background:var(--green)}
+.progress-labels{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+
+/* ── Stats row ── */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.2rem}
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:.85rem 1rem}
+.stat-label{font-size:.68rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-family:'Syne',sans-serif;margin-bottom:.3rem}
+.stat-val{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;color:var(--ink)}
+
+/* ── Status pill ── */
+.pill{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-family:'Syne',sans-serif;font-weight:700;padding:.25rem .75rem;border-radius:99px;margin-bottom:1rem}
+.pill-active{background:var(--green-lt);color:var(--green)}
+.pill-ended{background:var(--red-lt);color:var(--red)}
+.pill-success{background:var(--gold-lt);color:var(--gold)}
+
+/* ── Campaign title ── */
+.camp-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;line-height:1.2;margin-bottom:.4rem}
+.camp-desc{font-size:.875rem;color:var(--muted);line-height:1.6;margin-bottom:1rem}
+
+/* ── My contribution ── */
+.my-contrib{font-size:.8rem;color:var(--muted);margin-top:.75rem}
+.my-contrib strong{color:var(--ink)}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;padding:.65rem 1.1rem;border-radius:6px;font-size:.82rem;opacity:0;transform:translateY(8px);transition:all .3s;z-index:999;max-width:280px;border:1.5px solid}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast-ok{background:var(--green-lt);border-color:var(--green);color:var(--green)}
+.toast-err{background:var(--red-lt);border-color:var(--red);color:var(--red)}
+.toast-info{background:var(--gold-lt);border-color:var(--gold);color:var(--gold)}
+
+/* ── Divider ── */
+hr{border:none;border-top:1px solid var(--line);margin:1.2rem 0}
+
+/* ── Connect hero ── */
+.hero{text-align:center;padding:3rem 1rem}
+.hero-icon{font-size:3rem;margin-bottom:1rem}
+.hero h2{font-family:'Syne',sans-serif;font-weight:800;font-size:1.8rem;margin-bottom:.5rem}
+.hero p{color:var(--muted);margin-bottom:2rem;line-height:1.6}
+
+/* ── Timer ── */
+.timer{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--muted);margin-bottom:1rem}
+.timer span{color:var(--ink)}
+
+@media(max-width:480px){
+  .stats{grid-template-columns:1fr 1fr}
+  .row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">众<span>筹</span> DApp</div>
+    <div id="wallet-info"></div>
+  </header>
+
+  <!-- ── Hero (未连接) ── -->
+  <div id="hero" class="hero">
+    <div class="hero-icon">🌱</div>
+    <h2>链上众筹平台</h2>
+    <p>发起项目，设定目标与截止日期。<br>达标则创建者提取，未达标则捐款人全额退款。</p>
+    <button class="btn" onclick="connectWallet()">连接 MetaMask</button>
+  </div>
+
+  <!-- ── 合约地址 ── -->
+  <div id="sec-addr" class="section card">
+    <div class="card-label">合约地址</div>
+    <div class="row">
+      <div class="field">
+        <label>粘贴已部署的 Crowdfund 合约地址</label>
+        <input id="inp-addr" type="text" placeholder="0x…"/>
+      </div>
+      <button class="btn" style="align-self:flex-end;height:38px;white-space:nowrap" onclick="loadContract()">载入</button>
+    </div>
+    <p style="margin-top:.75rem;font-size:.78rem;color:var(--muted)">
+      通过 <a href="https://remix.ethereum.org" target="_blank" style="color:var(--gold)">Remix</a> 部署 <code>Crowdfund.sol</code>，填入标题、描述、目标 ETH 和天数。
+    </p>
+  </div>
+
+  <!-- ── 众筹主面板 ── -->
+  <div id="sec-main" class="section">
+
+    <!-- 状态标签 -->
+    <div id="pill-wrap"></div>
+
+    <!-- 标题描述 -->
+    <div class="card" style="padding-bottom:1.2rem">
+      <div class="camp-title" id="c-title">—</div>
+      <div class="camp-desc"  id="c-desc">—</div>
+      <div class="timer" id="c-timer"></div>
+
+      <!-- 进度条 -->
+      <div class="progress-wrap">
+        <div class="progress-track"><div class="progress-bar" id="prog-bar" style="width:0%"></div></div>
+        <div class="progress-labels">
+          <span id="prog-raised">已募 0 ETH</span>
+          <span id="prog-pct">0%</span>
+          <span id="prog-goal">目标 — ETH</span>
+        </div>
+      </div>
+
+      <!-- 统计 -->
+      <div class="stats">
+        <div class="stat"><div class="stat-label">已募金额</div><div class="stat-val" id="st-raised">—</div></div>
+        <div class="stat"><div class="stat-label">目标金额</div><div class="stat-val" id="st-goal">—</div></div>
+        <div class="stat"><div class="stat-label">捐款人数</div><div class="stat-val" id="st-donors">—</div></div>
+      </div>
+
+      <!-- 我的贡献 -->
+      <div class="my-contrib" id="my-contrib"></div>
+    </div>
+
+    <!-- ── 捐款区 ── -->
+    <div id="sec-donate" class="section card">
+      <div class="card-label">捐款</div>
+      <div class="row">
+        <div class="field">
+          <label>捐款金额 (ETH)</label>
+          <input id="inp-eth" type="number" min="0.001" step="0.001" placeholder="0.1"/>
+        </div>
+        <button class="btn-gold" style="align-self:flex-end;height:38px" onclick="doDonate()">捐款 ✦</button>
+      </div>
+    </div>
+
+    <!-- ── 创建者提取 ── -->
+    <div id="sec-withdraw" class="section card">
+      <div class="card-label">创建者操作</div>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">众筹已结束且达标，可以提取全部资金。</p>
+      <button class="btn-green" onclick="doWithdraw()">提取资金 →</button>
+    </div>
+
+    <!-- ── 退款区 ── -->
+    <div id="sec-refund" class="section card">
+      <div class="card-label">申请退款</div>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">众筹已结束但未达标，你可以取回你的捐款。</p>
+      <button class="btn-red" onclick="doRefund()">申请退款 ↩</button>
+    </div>
+
+    <!-- 刷新 -->
+    <div style="text-align:right;margin-top:-.5rem">
+      <button class="btn-outline" style="font-size:.78rem;padding:.35rem .85rem" onclick="refresh()">↻ 刷新数据</button>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const ABI = [
+  "function getInfo() view returns (string,string,uint256,uint256,uint256,bool,uint256)",
+  "function myContribution(address) view returns (uint256)",
+  "function donate() payable",
+  "function withdraw()",
+  "function refund()",
+  "function owner() view returns (address)",
+  "event Donated(address indexed,uint256)",
+  "event Withdrawn(address indexed,uint256)",
+  "event Refunded(address indexed,uint256)",
+];
+
+let provider, signer, contract, userAddr, ownerAddr;
+let savedAddr = localStorage.getItem("cf_addr") || "";
+
+// ── utils ──
+const $ = id => document.getElementById(id);
+const show = id => $(id).classList.add("on");
+const hide = id => $(id).classList.remove("on");
+const fmt = wei => parseFloat(ethers.utils.formatEther(wei)).toFixed(4).replace(/\.?0+$/,"");
+
+function toast(msg, type="info"){
+  const el=document.createElement("div");
+  el.className=`toast toast-${type}`; el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.classList.add("show"),10);
+  setTimeout(()=>{el.classList.remove("show");setTimeout(()=>el.remove(),400)},3500);
+}
+function setBtn(id,loading,orig){
+  const b=$(id); if(!b)return;
+  b.disabled=loading;
+  b.textContent=loading?"处理中…":orig;
+}
+
+// ── Connect ──
+async function connectWallet(){
+  if(!window.ethereum){toast("请先安装 MetaMask","err");return;}
+  try{
+    provider=new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send("eth_requestAccounts",[]);
+    signer=provider.getSigner();
+    userAddr=await signer.getAddress();
+    $("wallet-info").innerHTML=`<span class="badge">${userAddr.slice(0,6)}…${userAddr.slice(-4)}</span>`;
+    $("hero").style.display="none";
+    show("sec-addr");
+    if(savedAddr){ $("inp-addr").value=savedAddr; await loadContract(); }
+  }catch(e){toast(e.message,"err");}
+}
+
+// ── Load Contract ──
+async function loadContract(){
+  const addr=$("inp-addr").value.trim();
+  if(!ethers.utils.isAddress(addr)){toast("地址无效","err");return;}
+  try{
+    contract=new ethers.Contract(addr,ABI,signer);
+    ownerAddr=await contract.owner();
+    savedAddr=addr; localStorage.setItem("cf_addr",addr);
+    await refresh();
+    show("sec-main");
+    listenEvents();
+    toast("合约已载入","ok");
+  }catch(e){toast("载入失败："+( e.reason||e.message),"err");}
+}
+
+// ── Refresh ──
+async function refresh(){
+  if(!contract)return;
+  try{
+    const [title,desc,goal,raised,deadline,withdrawn,donors] = await contract.getInfo();
+    const myC = await contract.myContribution(userAddr);
+    const now  = Math.floor(Date.now()/1000);
+    const ended = now >= Number(deadline);
+    const reached = raised.gte(goal);
+    const isOwner = ownerAddr.toLowerCase()===userAddr.toLowerCase();
+
+    // title/desc
+    $("c-title").textContent = title;
+    $("c-desc").textContent  = desc;
+
+    // timer
+    if(!ended){
+      const rem = Number(deadline)-now;
+      const d=Math.floor(rem/86400), h=Math.floor((rem%86400)/3600), m=Math.floor((rem%3600)/60);
+      $("c-timer").innerHTML=`剩余：<span>${d}天 ${h}小时 ${m}分钟</span>`;
+    } else {
+      $("c-timer").innerHTML=`<span style="color:var(--red)">众筹已结束</span>`;
+    }
+
+    // pill
+    let pillHTML="";
+    if(!ended) pillHTML=`<div class="pill pill-active">🟢 进行中</div>`;
+    else if(reached) pillHTML=`<div class="pill pill-success">✦ 已达标</div>`;
+    else pillHTML=`<div class="pill pill-ended">● 未达标</div>`;
+    $("pill-wrap").innerHTML=pillHTML;
+
+    // progress
+    const goalE  = parseFloat(ethers.utils.formatEther(goal));
+    const raisedE= parseFloat(ethers.utils.formatEther(raised));
+    const pct    = goalE>0 ? Math.min(100,(raisedE/goalE)*100) : 0;
+    $("prog-bar").style.width=pct.toFixed(1)+"%";
+    if(reached) $("prog-bar").classList.add("done");
+    $("prog-raised").textContent=`已募 ${fmt(raised)} ETH`;
+    $("prog-pct").textContent=pct.toFixed(1)+"%";
+    $("prog-goal").textContent=`目标 ${fmt(goal)} ETH`;
+
+    // stats
+    $("st-raised").textContent=fmt(raised)+" ETH";
+    $("st-goal").textContent=fmt(goal)+" ETH";
+    $("st-donors").textContent=donors.toString()+" 人";
+
+    // my contrib
+    if(myC.gt(0)){
+      $("my-contrib").innerHTML=`你的捐款：<strong>${fmt(myC)} ETH</strong>`;
+    } else {
+      $("my-contrib").textContent="";
+    }
+
+    // action panels
+    hide("sec-donate"); hide("sec-withdraw"); hide("sec-refund");
+    if(!ended) show("sec-donate");
+    if(ended && reached && isOwner && !withdrawn) show("sec-withdraw");
+    if(ended && !reached && myC.gt(0)) show("sec-refund");
+
+  }catch(e){ toast("刷新失败","err"); }
+}
+
+// ── Donate ──
+async function doDonate(){
+  const val=$("inp-eth").value.trim();
+  if(!val||isNaN(val)||+val<=0){toast("请输入捐款金额","err");return;}
+  try{
+    setBtn("btn-donate",true,"捐款 ✦"); // btn id not used, direct disable below
+    const t=await contract.donate({value:ethers.utils.parseEther(String(val))});
+    toast("交易已发送，等待确认…","info");
+    await t.wait();
+    toast("捐款成功！","ok");
+    await refresh();
+    $("inp-eth").value="";
+  }catch(e){toast(e.reason||e.message,"err");}
+}
+
+// ── Withdraw ──
+async function doWithdraw(){
+  try{
+    const t=await contract.withdraw();
+    toast("提取交易已发送…","info");
+    await t.wait();
+    toast("资金提取成功！","ok");
+    await refresh();
+  }catch(e){toast(e.reason||e.message,"err");}
+}
+
+// ── Refund ──
+async function doRefund(){
+  try{
+    const t=await contract.refund();
+    toast("退款交易已发送…","info");
+    await t.wait();
+    toast("退款成功！","ok");
+    await refresh();
+  }catch(e){toast(e.reason||e.message,"err");}
+}
+
+// ── Events ──
+function listenEvents(){
+  contract.on("Donated",()=>refresh());
+  contract.on("Withdrawn",()=>refresh());
+  contract.on("Refunded",()=>refresh());
+}
+
+// ── Auto-connect if MetaMask already approved ──
+window.addEventListener("load",async()=>{
+  if(window.ethereum){
+    try{
+      const accounts=await window.ethereum.request({method:"eth_accounts"});
+      if(accounts.length) connectWallet();
+    }catch(e){}
+  }
+});
+window.ethereum?.on("accountsChanged",()=>location.reload());
+</script>
+</body>
+</html>
